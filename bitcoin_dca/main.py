@@ -24,9 +24,18 @@ import json
 from bitcoin_dca.data_loader import DataLoader, LazyFeatureManager
 
 # Version management
-APP_VERSION = "1.1.0"
+try:
+    from importlib.metadata import version
+    APP_VERSION = version("bitcoin-dca")
+except ImportError:
+    # Fallback for Python < 3.8 or development mode
+    try:
+        from importlib_metadata import version
+        APP_VERSION = version("bitcoin-dca")
+    except ImportError:
+        # Final fallback for development
+        APP_VERSION = "1.2.0"
 REPO_URL = "https://github.com/obokaman-com/bitcoin-dca"
-API_URL = "https://api.github.com/repos/obokaman-com/bitcoin-dca"
 
 def get_app_directory():
     """Get the application directory, creating it if needed"""
@@ -43,83 +52,35 @@ def get_default_csv_path():
     """Get the default CSV file path in the app directory"""
     return get_app_directory() / 'data' / 'btc_daily_2010_2025.csv'
 
-def get_current_commit_hash():
-    """Get the current local commit hash"""
-    try:
-        app_dir = get_app_directory()
-        if (app_dir / '.git').exists():
-            result = subprocess.run(
-                ['git', 'rev-parse', 'HEAD'],
-                cwd=app_dir,
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            if result.returncode == 0:
-                return result.stdout.strip()
-    except:
-        pass
-    return None
-
-def get_remote_commit_hash():
-    """Get the latest commit hash from GitHub (with short timeout)"""
-    try:
-        # Short timeout to avoid blocking startup
-        response = requests.get(f"{API_URL}/commits/main", timeout=3)
-        if response.status_code == 200:
-            data = response.json()
-            return data['sha']
-    except:
-        # Silently fail - network issues shouldn't block the app
-        pass
-    return None
 
 def check_for_updates():
-    """Check if a newer version is available (non-blocking)"""
+    """Check if a newer version is available on PyPI (non-blocking)"""
     try:
-        local_hash = get_current_commit_hash()
-        if not local_hash:
-            return False, None
-            
-        # Quick timeout to avoid blocking
-        remote_hash = get_remote_commit_hash()
-        if not remote_hash:
-            return False, None
+        import requests
+        from packaging import version
         
-        if local_hash != remote_hash:
-            return True, remote_hash
+        # Get current version
+        current_version = APP_VERSION
+        
+        # Quick timeout to avoid blocking
+        response = requests.get(
+            "https://pypi.org/pypi/bitcoin-dca/json",
+            timeout=3
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            latest_version = data["info"]["version"]
+            
+            # Compare versions using packaging library
+            if version.parse(latest_version) > version.parse(current_version):
+                return True, latest_version
+        
         return False, None
     except:
-        # Silently fail - never block the app
+        # Silently fail - network issues shouldn't block the app
         return False, None
 
-def update_app():
-    """Update the application to the latest version"""
-    try:
-        app_dir = get_app_directory()
-        
-        with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress:
-            task = progress.add_task("Updating Bitcoin DCA Analyzer...", total=None)
-            
-            # Pull latest changes
-            result = subprocess.run(
-                ['git', 'pull', 'origin', 'main'],
-                cwd=app_dir,
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-            
-            if result.returncode == 0:
-                progress.update(task, description="✅ Update completed successfully")
-                return True, "Update completed successfully!"
-            else:
-                return False, f"Git pull failed: {result.stderr}"
-                
-    except subprocess.TimeoutExpired:
-        return False, "Update timed out"
-    except Exception as e:
-        return False, f"Update failed: {str(e)}"
 
 # Lazy imports - only import when needed
 _predictor_module = None
@@ -438,40 +399,20 @@ class BTCAnalyzer:
         console.print(table)
     
     def check_and_offer_update(self):
-        """Check for updates and offer to update if available (non-blocking)"""
+        """Check for updates and inform user how to update (non-blocking)"""
         try:
             # Quick, silent background check - no progress spinner to avoid blocking
-            has_update, remote_hash = check_for_updates()
+            has_update, latest_version = check_for_updates()
                 
             if has_update:
                 console.print()
                 console.print("[yellow]🔄 A newer version is available![/yellow]")
-                
-                # Show current vs available version info
-                local_hash = get_current_commit_hash()
-                if local_hash and remote_hash:
-                    console.print(f"[dim]Current: {local_hash[:8]}[/dim]")
-                    console.print(f"[dim]Latest:  {remote_hash[:8]}[/dim]")
-                
-                update_choice = Prompt.ask(
-                    "Would you like to update now?", 
-                    choices=["y", "n"], 
-                    default="n"
-                )
-                
-                if update_choice == "y":
-                    # Only show progress when actually updating
-                    with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress:
-                        task = progress.add_task("Updating...", total=None)
-                        success, message = update_app()
-                        progress.update(task, description="✅ Update completed" if success else "❌ Update failed")
-                    
-                    if success:
-                        console.print(f"[green]✅ {message}[/green]")
-                        console.print("[yellow]⚠️  Please restart the application to use the new version.[/yellow]")
-                        return True  # Indicate restart needed
-                    else:
-                        console.print(f"[red]❌ Update failed: {message}[/red]")
+                console.print(f"[dim]Current: v{APP_VERSION}[/dim]")
+                console.print(f"[dim]Latest:  v{latest_version}[/dim]")
+                console.print()
+                console.print("[green]To update, run:[/green]")
+                console.print("[bold cyan]pip install --upgrade bitcoin-dca[/bold cyan]")
+                console.print()
                     
         except Exception as e:
             # Silently fail version check - don't interrupt user experience

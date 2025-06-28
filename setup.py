@@ -11,7 +11,7 @@ with open('README.md', encoding='utf-8') as f:
 
 setup(
     name="bitcoin-dca",
-    version="1.1.0",  # Match APP_VERSION in main.py
+    version="1.2.0",
     packages=find_packages(),
     install_requires=requirements,
     entry_points={

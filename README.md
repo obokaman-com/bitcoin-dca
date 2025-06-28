@@ -290,7 +290,7 @@ This tool is for educational and research purposes only. Cryptocurrency investme
 
 **Python version errors:**
 ```bash
-# Check your Python version
+# Check your Python version (requires 3.8+)
 python3 --version
 
 # Update Python (macOS)
@@ -300,12 +300,26 @@ brew install python3
 sudo apt install python3.8 python3.8-pip
 ```
 
-**TensorFlow installation issues on Apple Silicon:**
+**Installation failures:**
 ```bash
-pip3 install tensorflow-macos --user
+# Try with pip3 explicitly
+pip3 install bitcoin-dca
+
+# Or with user install
+pip install --user bitcoin-dca
+
+# Force reinstall if corrupted
+pip install --force-reinstall bitcoin-dca
 ```
 
-**Missing system dependencies:**
+**TensorFlow installation issues on Apple Silicon:**
+```bash
+# If TensorFlow fails, install manually first
+pip install tensorflow-macos
+pip install bitcoin-dca
+```
+
+**Missing system dependencies (for compilation):**
 ```bash
 # macOS
 xcode-select --install
@@ -317,32 +331,28 @@ sudo apt install build-essential python3-dev
 sudo yum groupinstall "Development Tools"
 ```
 
-**Permission errors:**
-```bash
-# Ensure ~/.local/bin exists and is writable
-mkdir -p ~/.local/bin
-chmod 755 ~/.local/bin
-```
-
 ### Runtime Issues
 
 **Command not found after installation:**
 ```bash
-# Restart terminal or reload shell
-source ~/.bashrc  # or ~/.zshrc
+# Check if pip installed correctly
+pip show bitcoin-dca
 
-# Or add to PATH manually
-export PATH="$HOME/.local/bin:$PATH"
+# Try running directly
+python -m bitcoin_dca.main
+
+# Reinstall if needed
+pip install --force-reinstall bitcoin-dca
 ```
 
-**Dependency errors:**
+**Dependency conflicts:**
 ```bash
-# Reinstall dependencies
-pip3 install -r requirements.txt --user --force-reinstall
+# Update all dependencies
+pip install --upgrade bitcoin-dca
 
-# Or reinstall the entire application
-curl -fsSL https://raw.githubusercontent.com/obokaman-com/bitcoin-dca/main/uninstall.sh | bash
-curl -fsSL https://raw.githubusercontent.com/obokaman-com/bitcoin-dca/main/install.sh | bash
+# Clean reinstall
+pip uninstall bitcoin-dca
+pip install bitcoin-dca
 ```
 
 ## Contributing
