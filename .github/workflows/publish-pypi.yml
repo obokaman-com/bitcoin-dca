@@ -46,6 +46,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install build twine
     
+    - name: Install package in development mode
+      run: pip install -e .
+    
     - name: Extract version from tag
       id: get_version
       run: |
