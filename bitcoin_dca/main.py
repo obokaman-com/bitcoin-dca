@@ -24,7 +24,7 @@ import json
 from bitcoin_dca.data_loader import DataLoader, LazyFeatureManager
 
 # Version management
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 REPO_URL = "https://github.com/obokaman-com/bitcoin-dca"
 API_URL = "https://api.github.com/repos/obokaman-com/bitcoin-dca"
 
