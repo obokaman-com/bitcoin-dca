@@ -40,44 +40,26 @@ A comprehensive terminal application for Bitcoin analysis featuring:
 
 ## Installation
 
-### 🚀 One-Liner Installation (Recommended)
+### 🚀 PyPI Installation (Recommended)
 
-Install globally with a single command:
+Install from PyPI with a single command:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/obokaman-com/bitcoin-dca/main/install.sh | bash
+pip install bitcoin-dca
 ```
 
-This will:
-- Install the app to `~/.bitcoin-dca/`
-- Install all dependencies (with version checking)
-- Create a global `btc-dca` command
-- Set up data and cache directories
-- Configure PATH for your shell (bash, zsh, fish)
-
-**Requirements:** Python 3.8+, pip3, git
-
-**Supported platforms:** macOS, Ubuntu, Debian, CentOS, RHEL, and other Linux distributions
-
-After installation, simply run:
+Then run:
 ```bash
 btc-dca
 ```
 
-### 🗑️ Uninstalling
+**Requirements:** Python 3.8+, pip
 
-To completely remove the application:
+**Supported platforms:** macOS, Linux, Windows
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/obokaman-com/bitcoin-dca/main/uninstall.sh | bash
-```
+### 📦 Development Installation
 
-This will:
-- Remove all application files from `~/.bitcoin-dca/`
-- Remove the global `btc-dca` command
-- Optionally backup your data before removal
-
-### 📦 Manual Installation (Development)
+For development or to get the latest features:
 
 1. **Clone the repository**:
    ```bash
@@ -85,15 +67,26 @@ This will:
    cd bitcoin-dca
    ```
 
-2. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Install as package**:
+2. **Install in development mode**:
    ```bash
    pip install -e .
    ```
+
+### 🗑️ Uninstalling
+
+To remove the application:
+
+```bash
+pip uninstall bitcoin-dca
+```
+
+### 🔄 Upgrading
+
+To upgrade to the latest version:
+
+```bash
+pip install --upgrade bitcoin-dca
+```
 
 ## Testing
 
@@ -114,20 +107,14 @@ The test suite includes:
 
 ## Usage
 
-### Installation
-```bash
-# Install as a package
-pip install -e .
-```
-
 ### Quick Start
 
-**After one-liner installation:**
+**After PyPI installation:**
 ```bash
 btc-dca
 ```
 
-**For manual installation:**
+**For development:**
 ```bash
 # Run as module
 python -m bitcoin_dca.main

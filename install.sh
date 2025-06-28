@@ -171,15 +171,15 @@ install_app() {
     print_success "Application downloaded!"
 }
 
-# Install Python dependencies
-install_dependencies() {
-    print_status "Installing Python dependencies..."
+# Install application as package
+install_package() {
+    print_status "Installing Bitcoin DCA Analyzer as Python package..."
     
     cd "$INSTALL_DIR"
     
-    # Try to install dependencies with better error handling
-    if ! $PIP_CMD install -r requirements.txt --user --quiet; then
-        print_error "Failed to install Python dependencies"
+    # Install the package with pip
+    if ! $PIP_CMD install . --user --quiet; then
+        print_error "Failed to install Bitcoin DCA Analyzer package"
         print_status "This could be due to:"
         print_status "  - Missing system libraries (see error above)"
         print_status "  - Insufficient disk space"
@@ -187,43 +187,47 @@ install_dependencies() {
         print_status "  - Python version compatibility"
         print_status ""
         print_status "Try installing manually:"
-        print_status "  $PIP_CMD install -r requirements.txt --user"
+        print_status "  cd $INSTALL_DIR && $PIP_CMD install . --user"
         print_status ""
         print_status "For TensorFlow issues on macOS with Apple Silicon:"
         print_status "  pip3 install tensorflow-macos --user"
         exit 1
     fi
     
-    # Verify critical dependencies are importable
-    if ! $PYTHON_CMD -c "import pandas, numpy, rich, click" 2>/dev/null; then
-        print_error "Critical dependencies failed to import properly"
+    # Verify the package was installed and is importable
+    if ! $PYTHON_CMD -c "import bitcoin_dca.main" 2>/dev/null; then
+        print_error "Package installed but failed to import properly"
         print_status "Try running the application manually to see detailed error:"
-        print_status "  cd $INSTALL_DIR && $PYTHON_CMD -m bitcoin_dca.main"
+        print_status "  $PYTHON_CMD -c 'import bitcoin_dca.main; bitcoin_dca.main.main()'"
         exit 1
     fi
     
-    print_success "Dependencies installed and verified!"
+    print_success "Package installed and verified!"
 }
 
-# Create executable script
-create_executable() {
-    print_status "Creating executable script..."
+# Check if pip installed executable properly
+check_pip_executable() {
+    print_status "Checking pip-installed executable..."
     
-    cat > "$BIN_DIR/btc-dca" << EOF
-#!/bin/bash
-# Bitcoin DCA Analyzer - Global executable wrapper
-
-# Change to app directory
-cd "$INSTALL_DIR"
-
-# Run the application with Python
-$PYTHON_CMD -m bitcoin_dca.main "\$@"
-EOF
+    # pip should have installed btc-dca to ~/.local/bin automatically
+    # But let's verify it exists and works
+    local pip_executable=""
     
-    # Make it executable
-    chmod +x "$BIN_DIR/btc-dca"
+    # Find where pip installed the executable
+    if [ -f "$HOME/.local/bin/btc-dca" ]; then
+        pip_executable="$HOME/.local/bin/btc-dca"
+    elif command -v btc-dca >/dev/null 2>&1; then
+        pip_executable=$(command -v btc-dca)
+    fi
     
-    print_success "Executable script created!"
+    if [ -n "$pip_executable" ] && [ -x "$pip_executable" ]; then
+        print_success "Pip executable found at: $pip_executable"
+        return 0
+    else
+        print_warning "Pip executable not found in expected locations"
+        print_status "This might indicate an issue with the pip installation"
+        return 1
+    fi
 }
 
 # Update PATH if needed
@@ -300,21 +304,29 @@ detect_os() {
 verify_installation() {
     print_status "Verifying installation..."
     
-    # Check if executable exists and is executable
-    if [ ! -f "$BIN_DIR/btc-dca" ]; then
-        print_error "Executable not found: $BIN_DIR/btc-dca"
+    # Check if the package is installed properly via pip
+    if ! $PIP_CMD show bitcoin-dca >/dev/null 2>&1; then
+        print_error "Package 'bitcoin-dca' not found in pip list"
         return 1
     fi
     
-    if [ ! -x "$BIN_DIR/btc-dca" ]; then
-        print_error "Executable is not executable: $BIN_DIR/btc-dca"
+    # Check if pip installed executable exists
+    if ! check_pip_executable; then
+        print_error "Pip-installed executable not found"
         return 1
     fi
     
     # Try to run a quick test (just check if it starts)
-    if ! "$BIN_DIR/btc-dca" --help >/dev/null 2>&1; then
-        print_warning "Executable created but may have runtime issues"
-        print_status "Try running manually to debug: $BIN_DIR/btc-dca"
+    if command -v btc-dca >/dev/null 2>&1; then
+        if ! btc-dca --help >/dev/null 2>&1; then
+            print_warning "Executable found but may have runtime issues"
+            print_status "Try running manually to debug: btc-dca"
+        fi
+    elif [ -f "$HOME/.local/bin/btc-dca" ]; then
+        if ! "$HOME/.local/bin/btc-dca" --help >/dev/null 2>&1; then
+            print_warning "Executable found but may have runtime issues"
+            print_status "Try running manually to debug: $HOME/.local/bin/btc-dca"
+        fi
     fi
     
     print_success "Installation verified!"
@@ -335,8 +347,8 @@ main() {
     check_prerequisites
     setup_directories
     install_app
-    install_dependencies
-    create_executable
+    install_package
+    check_pip_executable
     update_path
     
     if verify_installation; then
@@ -349,7 +361,7 @@ main() {
         echo "  btc-dca --help             # Show help"
         echo ""
         echo "Installation location: $INSTALL_DIR"
-        echo "Executable location: $BIN_DIR/btc-dca"
+        echo "Package installed via pip (use 'pip show bitcoin-dca' for details)"
         echo ""
         
         # Try to run a quick test if PATH is set up

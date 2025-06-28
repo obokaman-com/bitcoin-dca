@@ -17,6 +17,67 @@ INSTALL_DIR="$HOME/.bitcoin-dca"
 BIN_DIR="$HOME/.local/bin"
 BIN_FILE="$BIN_DIR/btc-dca"
 
+# Detect the correct Python and pip commands (same logic as install.sh)
+detect_python_commands() {
+    # Try different combinations to find matching python/pip pairs
+    
+    # Option 1: python3 + pip3
+    if command_exists python3 && command_exists pip3; then
+        python_version=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
+        pip_python_version=$(pip3 --version 2>/dev/null | grep -o "python [0-9]\+\.[0-9]\+" | cut -d' ' -f2)
+        
+        if [ "$python_version" = "$pip_python_version" ]; then
+            PYTHON_CMD="python3"
+            PIP_CMD="pip3"
+            return 0
+        fi
+    fi
+    
+    # Option 2: python + pip
+    if command_exists python && command_exists pip; then
+        python_version=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
+        pip_python_version=$(pip --version 2>/dev/null | grep -o "python [0-9]\+\.[0-9]\+" | cut -d' ' -f2)
+        
+        if [ "$python_version" = "$pip_python_version" ]; then
+            PYTHON_CMD="python"
+            PIP_CMD="pip"
+            return 0
+        fi
+    fi
+    
+    # Option 3: python3 + python -m pip
+    if command_exists python3; then
+        if python3 -m pip --version >/dev/null 2>&1; then
+            PYTHON_CMD="python3"
+            PIP_CMD="python3 -m pip"
+            return 0
+        fi
+    fi
+    
+    # Option 4: python + python -m pip
+    if command_exists python; then
+        if python -m pip --version >/dev/null 2>&1; then
+            PYTHON_CMD="python"
+            PIP_CMD="python -m pip"
+            return 0
+        fi
+    fi
+    
+    # If nothing works, fall back to python3/pip3
+    if command_exists python3 && command_exists pip3; then
+        PYTHON_CMD="python3"
+        PIP_CMD="pip3"
+        return 0
+    fi
+    
+    return 1
+}
+
+# Check if command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
 # Helper functions
 print_status() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -46,15 +107,34 @@ remove_app_files() {
     fi
 }
 
-# Remove executable
-remove_executable() {
-    print_status "Removing executable..."
+# Remove pip package
+remove_pip_package() {
+    print_status "Removing pip package..."
     
+    # Detect Python commands first
+    if ! detect_python_commands; then
+        print_warning "Could not detect Python/pip commands"
+        print_status "You may need to manually run: pip uninstall bitcoin-dca"
+        return 1
+    fi
+    
+    # Check if package is installed
+    if $PIP_CMD show bitcoin-dca >/dev/null 2>&1; then
+        if $PIP_CMD uninstall bitcoin-dca -y >/dev/null 2>&1; then
+            print_success "Removed bitcoin-dca package via pip"
+        else
+            print_error "Failed to remove bitcoin-dca package via pip"
+            print_status "Try manually: $PIP_CMD uninstall bitcoin-dca"
+            return 1
+        fi
+    else
+        print_warning "bitcoin-dca package not found in pip"
+    fi
+    
+    # Also remove any leftover executable (in case of mixed installations)
     if [ -f "$BIN_FILE" ]; then
         rm -f "$BIN_FILE"
-        print_success "Removed $BIN_FILE"
-    else
-        print_warning "Executable not found: $BIN_FILE"
+        print_status "Removed leftover executable: $BIN_FILE"
     fi
 }
 
@@ -104,11 +184,37 @@ show_data_info() {
 
 # Check if app is installed
 check_installation() {
-    if [ ! -d "$INSTALL_DIR" ] && [ ! -f "$BIN_FILE" ]; then
+    # Detect Python commands for pip check
+    detect_python_commands >/dev/null 2>&1
+    
+    local is_pip_installed=false
+    local is_manual_installed=false
+    
+    # Check if pip package is installed
+    if [ -n "$PIP_CMD" ] && $PIP_CMD show bitcoin-dca >/dev/null 2>&1; then
+        is_pip_installed=true
+    fi
+    
+    # Check if manual installation exists
+    if [ -d "$INSTALL_DIR" ] || [ -f "$BIN_FILE" ]; then
+        is_manual_installed=true
+    fi
+    
+    if [ "$is_pip_installed" = false ] && [ "$is_manual_installed" = false ]; then
         print_error "Bitcoin DCA Analyzer does not appear to be installed."
-        print_status "Installation directory: $INSTALL_DIR"
-        print_status "Executable: $BIN_FILE"
+        print_status "Checked for:"
+        print_status "  - Pip package: bitcoin-dca"
+        print_status "  - Installation directory: $INSTALL_DIR"
+        print_status "  - Executable: $BIN_FILE"
         exit 1
+    fi
+    
+    if [ "$is_pip_installed" = true ]; then
+        print_status "Found pip-installed package: bitcoin-dca"
+    fi
+    
+    if [ "$is_manual_installed" = true ]; then
+        print_status "Found manual installation files"
     fi
 }
 
@@ -122,9 +228,10 @@ main() {
     check_installation
     
     print_warning "This will completely remove Bitcoin DCA Analyzer from your system."
-    echo "Files to be removed:"
-    echo "  - Application: $INSTALL_DIR"
-    echo "  - Executable: $BIN_FILE"
+    echo "Items to be removed:"
+    echo "  - Pip package: bitcoin-dca (if installed)"
+    echo "  - Application directory: $INSTALL_DIR"
+    echo "  - Any leftover executables"
     echo ""
     
     read -p "Are you sure you want to uninstall? [y/N]: " -n 1 -r
@@ -139,8 +246,8 @@ main() {
     show_data_info
     
     # Perform uninstall
+    remove_pip_package
     remove_app_files
-    remove_executable
     clean_path_entries
     
     echo ""
