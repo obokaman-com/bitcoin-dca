@@ -24,17 +24,7 @@ import json
 from bitcoin_dca.data_loader import DataLoader, LazyFeatureManager
 
 # Version management
-try:
-    from importlib.metadata import version
-    APP_VERSION = version("bitcoin-dca")
-except ImportError:
-    # Fallback for Python < 3.8 or development mode
-    try:
-        from importlib_metadata import version
-        APP_VERSION = version("bitcoin-dca")
-    except ImportError:
-        # Final fallback for development
-        APP_VERSION = "1.2.0"
+from . import __version__ as APP_VERSION
 REPO_URL = "https://github.com/obokaman-com/bitcoin-dca"
 
 def get_app_directory():

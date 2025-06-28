@@ -55,7 +55,7 @@ jobs:
     
     - name: Verify version matches
       run: |
-        PACKAGE_VERSION=$(python -c "from bitcoin_dca.main import APP_VERSION; print(APP_VERSION)")
+        PACKAGE_VERSION=$(python -c "from bitcoin_dca import __version__; print(__version__)")
         TAG_VERSION="${{ steps.get_version.outputs.version }}"
         echo "Package version: $PACKAGE_VERSION"
         echo "Tag version: $TAG_VERSION"
