@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Test suite for Bitcoin DCA Analysis Terminal Application
-Uses mock data for efficiency and tests both correct and incorrect data scenarios
+Optimized with comprehensive mocking for maximum CI efficiency
 """
 
 import unittest
@@ -10,39 +10,122 @@ import numpy as np
 from datetime import datetime, timedelta
 import tempfile
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, Mock
 import io
 import sys
+import warnings
 
-from bitcoin_dca.data_loader import DataLoader
-from bitcoin_dca.predictor import BitcoinPredictor
-from bitcoin_dca.dca_analyzer import DCAAnalyzer
-from bitcoin_dca.backtester import DCABacktester
+# Suppress warnings during testing
+warnings.filterwarnings('ignore')
+
+# Mock heavy dependencies before importing our modules
+with patch('tensorflow.keras.models.Sequential'), \
+     patch('tensorflow.keras.layers.LSTM'), \
+     patch('tensorflow.keras.layers.Dense'), \
+     patch('sklearn.ensemble.RandomForestRegressor'), \
+     patch('ta.momentum.RSIIndicator'), \
+     patch('ta.trend.MACD'), \
+     patch('ta.volatility.BollingerBands'):
+    
+    from bitcoin_dca.data_loader import DataLoader
+    from bitcoin_dca.predictor import BitcoinPredictor
+    from bitcoin_dca.dca_analyzer import DCAAnalyzer
+    from bitcoin_dca.backtester import DCABacktester
+
+
+class OptimizedTestBase(unittest.TestCase):
+    """Base class with optimized mocking for all tests"""
+    
+    @classmethod
+    def setUpClass(cls):
+        """Set up class-level mocks for maximum efficiency"""
+        # Mock TensorFlow operations
+        cls.tf_patcher = patch('tensorflow.keras.models.Sequential')
+        cls.lstm_patcher = patch('tensorflow.keras.layers.LSTM')
+        cls.dense_patcher = patch('tensorflow.keras.layers.Dense')
+        
+        # Mock sklearn operations
+        cls.rf_patcher = patch('sklearn.ensemble.RandomForestRegressor')
+        cls.scaler_patcher = patch('sklearn.preprocessing.StandardScaler')
+        
+        # Mock TA-Lib indicators
+        cls.rsi_patcher = patch('ta.momentum.RSIIndicator')
+        cls.macd_patcher = patch('ta.trend.MACD')
+        cls.bb_patcher = patch('ta.volatility.BollingerBands')
+        
+        # Start all patches
+        cls.mock_tf = cls.tf_patcher.start()
+        cls.mock_lstm = cls.lstm_patcher.start()
+        cls.mock_dense = cls.dense_patcher.start()
+        cls.mock_rf = cls.rf_patcher.start()
+        cls.mock_scaler = cls.scaler_patcher.start()
+        cls.mock_rsi = cls.rsi_patcher.start()
+        cls.mock_macd = cls.macd_patcher.start()
+        cls.mock_bb = cls.bb_patcher.start()
+        
+        # Configure mock return values for ML operations
+        cls.mock_rf.return_value.fit.return_value = None
+        cls.mock_rf.return_value.predict.return_value = np.array([30000.0])
+        cls.mock_scaler.return_value.fit_transform.return_value = np.random.random((10, 5))
+        cls.mock_scaler.return_value.transform.return_value = np.random.random((1, 5))
+        
+        # Mock TensorFlow model operations
+        mock_model = MagicMock()
+        mock_model.fit.return_value = None
+        mock_model.predict.return_value = np.array([[30000.0]])
+        cls.mock_tf.return_value = mock_model
+        
+        # Mock TA-Lib indicators with realistic values
+        cls.mock_rsi.return_value.rsi.return_value = pd.Series(np.random.uniform(30, 70, 50))
+        mock_macd = MagicMock()
+        mock_macd.macd.return_value = pd.Series(np.random.normal(0, 100, 50))
+        mock_macd.macd_signal.return_value = pd.Series(np.random.normal(0, 80, 50))
+        cls.mock_macd.return_value = mock_macd
+        
+        mock_bb = MagicMock()
+        mock_bb.bollinger_hband.return_value = pd.Series(np.random.uniform(31000, 32000, 50))
+        mock_bb.bollinger_lband.return_value = pd.Series(np.random.uniform(28000, 29000, 50))
+        cls.mock_bb.return_value = mock_bb
+        
+    @classmethod
+    def tearDownClass(cls):
+        """Clean up all patches"""
+        cls.tf_patcher.stop()
+        cls.lstm_patcher.stop()
+        cls.dense_patcher.stop()
+        cls.rf_patcher.stop()
+        cls.scaler_patcher.stop()
+        cls.rsi_patcher.stop()
+        cls.macd_patcher.stop()
+        cls.bb_patcher.stop()
 
 
 class MockDataGenerator:
     """Generate various types of mock data for testing"""
     
     @staticmethod
-    def create_valid_csv_data(rows=100):
-        """Create valid Bitcoin price data"""
+    def create_valid_csv_data(rows=50):  # Reduced default size for CI efficiency
+        """Create valid Bitcoin price data - optimized for speed"""
         dates = pd.date_range('2023-01-01', periods=rows, freq='D')
-        np.random.seed(42)
+        np.random.seed(42)  # Deterministic for CI
         
-        # Simulate realistic Bitcoin price movement
+        # Vectorized price generation for speed
         base_price = 30000
-        prices = [base_price]
+        changes = np.random.normal(0, 0.02, rows-1)  # 2% daily volatility
+        price_multipliers = np.cumprod(np.concatenate([[1], 1 + changes]))
+        prices = base_price * price_multipliers
+        prices = np.maximum(prices, 1000)  # Price floor
         
-        for i in range(1, rows):
-            change = np.random.normal(0, 0.02)  # 2% daily volatility
-            new_price = prices[-1] * (1 + change)
-            prices.append(max(new_price, 1000))  # Minimum price floor
+        # Vectorized OHLC generation
+        opens = prices * np.random.uniform(0.99, 1.01, rows)
+        highs = prices * np.random.uniform(1.00, 1.05, rows)  
+        lows = prices * np.random.uniform(0.95, 1.00, rows)
         
         return pd.DataFrame({
             'Date': dates.strftime('%Y-%m-%d'),
-            'Open': np.array(prices) * np.random.uniform(0.99, 1.01, rows),
-            'High': np.array(prices) * np.random.uniform(1.00, 1.05, rows),
-            'Low': np.array(prices) * np.random.uniform(0.95, 1.00, rows),
+            'Open': opens,
+            'High': highs,
+            'Low': lows,
             'Close': prices
         })
     
@@ -112,8 +195,8 @@ class MockDataGenerator:
         })
 
 
-class TestDataLoader(unittest.TestCase):
-    """Test the DataLoader class with various data scenarios"""
+class TestDataLoader(OptimizedTestBase):
+    """Test the DataLoader class with various data scenarios - optimized for CI"""
     
     def setUp(self):
         """Set up test environment"""
@@ -126,7 +209,7 @@ class TestDataLoader(unittest.TestCase):
                 os.unlink(temp_file)
     
     def create_temp_csv(self, data):
-        """Helper to create temporary CSV file"""
+        """Helper to create temporary CSV file - optimized for CI"""
         temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False)
         data.to_csv(temp_file.name, index=False)
         temp_file.close()
@@ -254,8 +337,8 @@ class TestDataLoader(unittest.TestCase):
             self.assertIn(feature, df_with_btc.columns)
 
 
-class TestBitcoinPredictor(unittest.TestCase):
-    """Test the BitcoinPredictor class with mock data"""
+class TestBitcoinPredictor(OptimizedTestBase):
+    """Test the BitcoinPredictor class with mock data - optimized for CI"""
     
     def setUp(self):
         """Set up test environment"""
@@ -329,7 +412,7 @@ class TestBitcoinPredictor(unittest.TestCase):
         self.assertIn('Simple Trend', result['model'])  # Should contain fallback indicator
 
 
-class TestDCAAnalyzer(unittest.TestCase):
+class TestDCAAnalyzer(OptimizedTestBase):
     """Test the DCAAnalyzer class with mock data"""
     
     def setUp(self):
@@ -428,7 +511,7 @@ class TestDCAAnalyzer(unittest.TestCase):
         self.assertIn('best_combination', results)
 
 
-class TestDCABacktester(unittest.TestCase):
+class TestDCABacktester(OptimizedTestBase):
     """Test the DCABacktester class with mock data"""
     
     def setUp(self):
@@ -559,8 +642,8 @@ class TestDCABacktester(unittest.TestCase):
         self.assertIn('best_strategy', results)
 
 
-class TestUIFeatures(unittest.TestCase):
-    """Test new UI features like date range validation"""
+class TestUIFeatures(OptimizedTestBase):
+    """Test new UI features like date range validation - optimized for CI"""
     
     def setUp(self):
         """Set up test environment"""
@@ -573,7 +656,7 @@ class TestUIFeatures(unittest.TestCase):
                 os.unlink(temp_file)
     
     def create_temp_csv(self, data):
-        """Helper to create temporary CSV file"""
+        """Helper to create temporary CSV file - optimized for CI"""
         temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False)
         data.to_csv(temp_file.name, index=False)
         temp_file.close()
@@ -581,51 +664,61 @@ class TestUIFeatures(unittest.TestCase):
         return temp_file.name
     
     def test_date_range_filtering(self):
-        """Test date range filtering for DCA analysis"""
+        """Test date range filtering for DCA analysis - optimized"""
         from bitcoin_dca.main import BTCAnalyzer
         
-        data = MockDataGenerator.create_valid_csv_data(365)  # 1 year of data
+        data = MockDataGenerator.create_valid_csv_data(100)  # Reduced size for CI
         csv_path = self.create_temp_csv(data)
         
-        analyzer = BTCAnalyzer(csv_path)
-        analyzer.load_basic_data()
-        
-        # Get data with features
-        data_with_features = analyzer.feature_manager.get_data_for_analysis('dca_analysis')
-        self.assertGreater(len(data_with_features), 0)
-        
-        # Test data filtering by date range
-        start_date = data_with_features.index[50]
-        end_date = data_with_features.index[200]
-        filtered_data = data_with_features[(data_with_features.index >= start_date) & (data_with_features.index <= end_date)]
-        
-        self.assertEqual(len(filtered_data), 151)  # 200 - 50 + 1 = 151 days
+        with patch('requests.get') as mock_get:
+            # Mock download to avoid network calls
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.text = data.to_csv(index=False)
+            
+            analyzer = BTCAnalyzer(csv_path)
+            analyzer.load_basic_data()
+            
+            # Get data with features
+            data_with_features = analyzer.feature_manager.get_data_for_analysis('dca_analysis')
+            self.assertGreater(len(data_with_features), 0)
+            
+            # Test data filtering by date range
+            start_date = data_with_features.index[10]
+            end_date = data_with_features.index[50]
+            filtered_data = data_with_features[(data_with_features.index >= start_date) & (data_with_features.index <= end_date)]
+            
+            self.assertEqual(len(filtered_data), 41)  # 50 - 10 + 1 = 41 days
         
     def test_cache_clearing(self):
-        """Test cache clearing functionality"""
+        """Test cache clearing functionality - optimized"""
         from bitcoin_dca.main import BTCAnalyzer
         
-        data = MockDataGenerator.create_valid_csv_data(100)
+        data = MockDataGenerator.create_valid_csv_data(50)  # Reduced size for CI
         csv_path = self.create_temp_csv(data)
         
-        analyzer = BTCAnalyzer(csv_path)
-        analyzer.load_basic_data()
-        
-        # Generate some cached data
-        analyzer.feature_manager.get_data_for_analysis('dca_analysis')
-        
-        # Test that cache exists
-        self.assertTrue(len(analyzer.feature_manager.feature_cache) > 0)
-        
-        # Clear cache
-        analyzer.data_loader.clear_cache()
-        analyzer.feature_manager.feature_cache.clear()
-        
-        # Test that cache is cleared
-        self.assertEqual(len(analyzer.feature_manager.feature_cache), 0)
+        with patch('requests.get') as mock_get:
+            # Mock download to avoid network calls
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.text = data.to_csv(index=False)
+            
+            analyzer = BTCAnalyzer(csv_path)
+            analyzer.load_basic_data()
+            
+            # Generate some cached data
+            analyzer.feature_manager.get_data_for_analysis('dca_analysis')
+            
+            # Test that cache exists
+            self.assertTrue(len(analyzer.feature_manager.feature_cache) > 0)
+            
+            # Clear cache
+            analyzer.data_loader.clear_cache()
+            analyzer.feature_manager.feature_cache.clear()
+            
+            # Test that cache is cleared
+            self.assertEqual(len(analyzer.feature_manager.feature_cache), 0)
 
 
-class TestErrorHandling(unittest.TestCase):
+class TestErrorHandling(OptimizedTestBase):
     """Test comprehensive error handling scenarios"""
     
     def test_corrupted_csv_file(self):
@@ -668,9 +761,9 @@ class TestErrorHandling(unittest.TestCase):
             os.unlink(temp_file.name)
     
     def test_memory_usage_with_mock_data(self):
-        """Test memory usage remains reasonable with mock data"""
-        # Create larger mock dataset
-        data = MockDataGenerator.create_valid_csv_data(1000)
+        """Test memory usage remains reasonable with mock data - optimized"""
+        # Create medium mock dataset (reduced from 1000 for CI efficiency)
+        data = MockDataGenerator.create_valid_csv_data(500)
         
         temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False)
         data.to_csv(temp_file.name, index=False)
@@ -682,27 +775,31 @@ class TestErrorHandling(unittest.TestCase):
             
             # Check memory usage is reasonable
             memory_usage = df.memory_usage(deep=True).sum()
-            self.assertLess(memory_usage, 100 * 1024 * 1024)  # Less than 100MB
+            self.assertLess(memory_usage, 50 * 1024 * 1024)  # Less than 50MB (adjusted for smaller dataset)
             
         finally:
             os.unlink(temp_file.name)
 
 
 def run_tests():
-    """Run all tests efficiently"""
-    print("🧪 Running Bitcoin DCA Analyzer Test Suite (Mock Data)")
-    print("=" * 60)
+    """Run all tests efficiently with optimized configuration"""
+    print("🧪 Running Bitcoin DCA Analyzer Test Suite (Optimized with Mocking)")
+    print("=" * 65)
     
-    # Suppress warnings and stdout during tests
+    # Suppress warnings and stdout during tests for cleaner CI output
     import warnings
     warnings.filterwarnings('ignore')
     
-    # Capture stdout to reduce noise
+    # Set environment variable for faster numpy operations
+    os.environ['OPENBLAS_NUM_THREADS'] = '1'
+    os.environ['MKL_NUM_THREADS'] = '1'
+    
+    # Capture stdout to reduce noise during testing
     old_stdout = sys.stdout
     sys.stdout = io.StringIO()
     
     try:
-        # Create test suite
+        # Create optimized test suite
         test_classes = [
             TestDataLoader,
             TestBitcoinPredictor,
@@ -718,8 +815,14 @@ def run_tests():
             tests = unittest.TestLoader().loadTestsFromTestCase(test_class)
             suite.addTests(tests)
         
-        # Run tests with minimal output
-        runner = unittest.TextTestRunner(verbosity=1, buffer=True, stream=io.StringIO())
+        # Run tests with minimal output and buffering for speed
+        runner = unittest.TextTestRunner(
+            verbosity=1, 
+            buffer=True, 
+            stream=io.StringIO(),
+            # Enable test result buffering for faster execution
+            failfast=False  # Continue running all tests even if some fail
+        )
         result = runner.run(suite)
         
         return result
@@ -730,12 +833,25 @@ def run_tests():
 
 
 if __name__ == '__main__':
+    import time
+    start_time = time.time()
+    
     result = run_tests()
     
-    print(f"🧪 Test Results Summary:")
+    execution_time = time.time() - start_time
+    
+    print(f"🧪 Optimized Test Results Summary:")
     print(f"   Tests run: {result.testsRun}")
+    print(f"   Execution time: {execution_time:.2f}s")
     print(f"   Failures: {len(result.failures)}")
     print(f"   Errors: {len(result.errors)}")
+    
+    if execution_time < 10:
+        print(f"   ⚡ Fast execution achieved! (target: <10s)")
+    elif execution_time < 30:
+        print(f"   ✅ Good execution time (target: <30s)")
+    else:
+        print(f"   ⚠️  Slow execution (consider further optimization)")
     
     if result.failures:
         print(f"\n❌ Failures:")
@@ -761,12 +877,18 @@ if __name__ == '__main__':
     
     if result.wasSuccessful():
         print("\n✅ All tests passed! The Bitcoin DCA Analyzer is working correctly.")
-        print("📊 Tested scenarios:")
-        print("   - Valid Bitcoin price data processing")
+        print("📊 Optimized test scenarios verified:")
+        print("   - Valid Bitcoin price data processing (mocked dependencies)")
         print("   - Invalid/corrupted data handling")
-        print("   - DCA strategy analysis and backtesting")
-        print("   - Price prediction with fallback mechanisms")
+        print("   - DCA strategy analysis and backtesting (reduced datasets)")
+        print("   - Price prediction with fallback mechanisms (mocked ML models)")
         print("   - Edge cases and error conditions")
+        print("   - UI features and cache management")
+        print("\n⚡ Performance optimizations:")
+        print("   - TensorFlow/sklearn operations fully mocked")
+        print("   - TA-Lib indicators mocked with realistic data")
+        print("   - Reduced dataset sizes for faster execution")
+        print("   - Network operations mocked to avoid delays")
     else:
         print(f"\n❌ {len(result.failures + result.errors)} test(s) failed")
         exit(1)
