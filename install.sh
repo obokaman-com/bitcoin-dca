@@ -39,14 +39,73 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Detect the correct Python and pip commands
+detect_python_commands() {
+    # Try different combinations to find matching python/pip pairs
+    
+    # Option 1: python3 + pip3
+    if command_exists python3 && command_exists pip3; then
+        python_version=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
+        pip_python_version=$(pip3 --version 2>/dev/null | grep -o "python [0-9]\+\.[0-9]\+" | cut -d' ' -f2)
+        
+        if [ "$python_version" = "$pip_python_version" ]; then
+            PYTHON_CMD="python3"
+            PIP_CMD="pip3"
+            return 0
+        fi
+    fi
+    
+    # Option 2: python + pip
+    if command_exists python && command_exists pip; then
+        python_version=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
+        pip_python_version=$(pip --version 2>/dev/null | grep -o "python [0-9]\+\.[0-9]\+" | cut -d' ' -f2)
+        
+        if [ "$python_version" = "$pip_python_version" ]; then
+            PYTHON_CMD="python"
+            PIP_CMD="pip"
+            return 0
+        fi
+    fi
+    
+    # Option 3: python3 + python -m pip
+    if command_exists python3; then
+        if python3 -m pip --version >/dev/null 2>&1; then
+            PYTHON_CMD="python3"
+            PIP_CMD="python3 -m pip"
+            return 0
+        fi
+    fi
+    
+    # Option 4: python + python -m pip
+    if command_exists python; then
+        if python -m pip --version >/dev/null 2>&1; then
+            PYTHON_CMD="python"
+            PIP_CMD="python -m pip"
+            return 0
+        fi
+    fi
+    
+    # If nothing works, fall back to python3/pip3
+    if command_exists python3 && command_exists pip3; then
+        PYTHON_CMD="python3"
+        PIP_CMD="pip3"
+        python_version=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
+        pip_python_version=$(pip3 --version 2>/dev/null | grep -o "python [0-9]\+\.[0-9]\+" | cut -d' ' -f2)
+        print_warning "Using potentially mismatched Python ($python_version) and pip ($pip_python_version)"
+        return 0
+    fi
+    
+    return 1
+}
+
 # Check prerequisites
 check_prerequisites() {
     print_status "Checking prerequisites..."
     
-    # Check Python 3
-    if ! command_exists python3; then
-        print_error "Python 3 is required but not installed."
-        print_status "Please install Python 3.8+ and try again:"
+    # Detect Python and pip commands
+    if ! detect_python_commands; then
+        print_error "Python 3 and pip are required but not found."
+        print_status "Please install Python 3.8+ and pip, then try again:"
         print_status "  macOS: brew install python3"
         print_status "  Ubuntu/Debian: sudo apt install python3 python3-pip"
         print_status "  CentOS/RHEL: sudo yum install python3 python3-pip"
@@ -54,25 +113,16 @@ check_prerequisites() {
     fi
     
     # Check Python version (need 3.8+ for TensorFlow)
-    python_version=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-    if ! python3 -c "import sys; exit(0 if sys.version_info >= (3, 8) else 1)"; then
+    python_version=$($PYTHON_CMD -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+    if ! $PYTHON_CMD -c "import sys; exit(0 if sys.version_info >= (3, 8) else 1)"; then
         print_error "Python 3.8+ is required, but found Python $python_version"
         print_status "Please upgrade Python and try again:"
         print_status "  macOS: brew install python3"
         print_status "  Ubuntu/Debian: sudo apt install python3.8+"
         exit 1
     fi
-    print_success "Python $python_version detected"
-    
-    # Check pip3
-    if ! command_exists pip3; then
-        print_error "pip3 is required but not installed."
-        print_status "Please install pip3 and try again:"
-        print_status "  macOS: python3 -m ensurepip --upgrade"
-        print_status "  Ubuntu/Debian: sudo apt install python3-pip"
-        print_status "  CentOS/RHEL: sudo yum install python3-pip"
-        exit 1
-    fi
+    print_success "Python $python_version detected (using $PYTHON_CMD)"
+    print_success "Pip detected (using $PIP_CMD)"
     
     # Check Git
     if ! command_exists git; then
@@ -128,7 +178,7 @@ install_dependencies() {
     cd "$INSTALL_DIR"
     
     # Try to install dependencies with better error handling
-    if ! pip3 install -r requirements.txt --user --quiet; then
+    if ! $PIP_CMD install -r requirements.txt --user --quiet; then
         print_error "Failed to install Python dependencies"
         print_status "This could be due to:"
         print_status "  - Missing system libraries (see error above)"
@@ -137,7 +187,7 @@ install_dependencies() {
         print_status "  - Python version compatibility"
         print_status ""
         print_status "Try installing manually:"
-        print_status "  pip3 install -r requirements.txt --user"
+        print_status "  $PIP_CMD install -r requirements.txt --user"
         print_status ""
         print_status "For TensorFlow issues on macOS with Apple Silicon:"
         print_status "  pip3 install tensorflow-macos --user"
@@ -145,10 +195,10 @@ install_dependencies() {
     fi
     
     # Verify critical dependencies are importable
-    if ! python3 -c "import pandas, numpy, rich, click" 2>/dev/null; then
+    if ! $PYTHON_CMD -c "import pandas, numpy, rich, click" 2>/dev/null; then
         print_error "Critical dependencies failed to import properly"
         print_status "Try running the application manually to see detailed error:"
-        print_status "  cd $INSTALL_DIR && python3 -m bitcoin_dca.main"
+        print_status "  cd $INSTALL_DIR && $PYTHON_CMD -m bitcoin_dca.main"
         exit 1
     fi
     
@@ -167,7 +217,7 @@ create_executable() {
 cd "$INSTALL_DIR"
 
 # Run the application with Python
-python3 -m bitcoin_dca.main "\$@"
+$PYTHON_CMD -m bitcoin_dca.main "\$@"
 EOF
     
     # Make it executable
