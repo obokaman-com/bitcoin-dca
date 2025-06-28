@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Test suite for Bitcoin DCA Analysis Terminal Application
-Optimized with comprehensive mocking for maximum CI efficiency
+Comprehensive test coverage with mocked dependencies
 """
 
 import unittest
@@ -33,8 +33,8 @@ with patch('tensorflow.keras.models.Sequential'), \
     from bitcoin_dca.backtester import DCABacktester
 
 
-class OptimizedTestBase(unittest.TestCase):
-    """Base class with optimized mocking for all tests"""
+class TestBase(unittest.TestCase):
+    """Base class with comprehensive mocking for all tests"""
     
     @classmethod
     def setUpClass(cls):
@@ -195,8 +195,8 @@ class MockDataGenerator:
         })
 
 
-class TestDataLoader(OptimizedTestBase):
-    """Test the DataLoader class with various data scenarios - optimized for CI"""
+class TestDataLoader(TestBase):
+    """Test the DataLoader class with various data scenarios"""
     
     def setUp(self):
         """Set up test environment"""
@@ -209,7 +209,7 @@ class TestDataLoader(OptimizedTestBase):
                 os.unlink(temp_file)
     
     def create_temp_csv(self, data):
-        """Helper to create temporary CSV file - optimized for CI"""
+        """Helper to create temporary CSV file"""
         temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False)
         data.to_csv(temp_file.name, index=False)
         temp_file.close()
@@ -337,8 +337,8 @@ class TestDataLoader(OptimizedTestBase):
             self.assertIn(feature, df_with_btc.columns)
 
 
-class TestBitcoinPredictor(OptimizedTestBase):
-    """Test the BitcoinPredictor class with mock data - optimized for CI"""
+class TestBitcoinPredictor(TestBase):
+    """Test the BitcoinPredictor class with mock data"""
     
     def setUp(self):
         """Set up test environment"""
@@ -412,7 +412,7 @@ class TestBitcoinPredictor(OptimizedTestBase):
         self.assertIn('Simple Trend', result['model'])  # Should contain fallback indicator
 
 
-class TestDCAAnalyzer(OptimizedTestBase):
+class TestDCAAnalyzer(TestBase):
     """Test the DCAAnalyzer class with mock data"""
     
     def setUp(self):
@@ -511,7 +511,7 @@ class TestDCAAnalyzer(OptimizedTestBase):
         self.assertIn('best_combination', results)
 
 
-class TestDCABacktester(OptimizedTestBase):
+class TestDCABacktester(TestBase):
     """Test the DCABacktester class with mock data"""
     
     def setUp(self):
@@ -642,8 +642,8 @@ class TestDCABacktester(OptimizedTestBase):
         self.assertIn('best_strategy', results)
 
 
-class TestUIFeatures(OptimizedTestBase):
-    """Test new UI features like date range validation - optimized for CI"""
+class TestUIFeatures(TestBase):
+    """Test new UI features like date range validation"""
     
     def setUp(self):
         """Set up test environment"""
@@ -656,7 +656,7 @@ class TestUIFeatures(OptimizedTestBase):
                 os.unlink(temp_file)
     
     def create_temp_csv(self, data):
-        """Helper to create temporary CSV file - optimized for CI"""
+        """Helper to create temporary CSV file"""
         temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False)
         data.to_csv(temp_file.name, index=False)
         temp_file.close()
@@ -664,10 +664,10 @@ class TestUIFeatures(OptimizedTestBase):
         return temp_file.name
     
     def test_date_range_filtering(self):
-        """Test date range filtering for DCA analysis - optimized"""
+        """Test date range filtering for DCA analysis"""
         from bitcoin_dca.main import BTCAnalyzer
         
-        data = MockDataGenerator.create_valid_csv_data(100)  # Reduced size for CI
+        data = MockDataGenerator.create_valid_csv_data(100)
         csv_path = self.create_temp_csv(data)
         
         with patch('requests.get') as mock_get:
@@ -690,10 +690,10 @@ class TestUIFeatures(OptimizedTestBase):
             self.assertEqual(len(filtered_data), 41)  # 50 - 10 + 1 = 41 days
         
     def test_cache_clearing(self):
-        """Test cache clearing functionality - optimized"""
+        """Test cache clearing functionality"""
         from bitcoin_dca.main import BTCAnalyzer
         
-        data = MockDataGenerator.create_valid_csv_data(50)  # Reduced size for CI
+        data = MockDataGenerator.create_valid_csv_data(50)
         csv_path = self.create_temp_csv(data)
         
         with patch('requests.get') as mock_get:
@@ -718,7 +718,7 @@ class TestUIFeatures(OptimizedTestBase):
             self.assertEqual(len(analyzer.feature_manager.feature_cache), 0)
 
 
-class TestErrorHandling(OptimizedTestBase):
+class TestErrorHandling(TestBase):
     """Test comprehensive error handling scenarios"""
     
     def test_corrupted_csv_file(self):
@@ -761,8 +761,8 @@ class TestErrorHandling(OptimizedTestBase):
             os.unlink(temp_file.name)
     
     def test_memory_usage_with_mock_data(self):
-        """Test memory usage remains reasonable with mock data - optimized"""
-        # Create medium mock dataset (reduced from 1000 for CI efficiency)
+        """Test memory usage remains reasonable with mock data"""
+        # Create medium mock dataset
         data = MockDataGenerator.create_valid_csv_data(500)
         
         temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False)
@@ -775,16 +775,16 @@ class TestErrorHandling(OptimizedTestBase):
             
             # Check memory usage is reasonable
             memory_usage = df.memory_usage(deep=True).sum()
-            self.assertLess(memory_usage, 50 * 1024 * 1024)  # Less than 50MB (adjusted for smaller dataset)
+            self.assertLess(memory_usage, 50 * 1024 * 1024)  # Less than 50MB
             
         finally:
             os.unlink(temp_file.name)
 
 
 def run_tests():
-    """Run all tests efficiently with optimized configuration"""
-    print("🧪 Running Bitcoin DCA Analyzer Test Suite (Optimized with Mocking)")
-    print("=" * 65)
+    """Run all tests efficiently"""
+    print("🧪 Running Bitcoin DCA Analyzer Test Suite")
+    print("=" * 50)
     
     # Suppress warnings and stdout during tests for cleaner CI output
     import warnings
@@ -840,18 +840,18 @@ if __name__ == '__main__':
     
     execution_time = time.time() - start_time
     
-    print(f"🧪 Optimized Test Results Summary:")
+    print(f"🧪 Test Results Summary:")
     print(f"   Tests run: {result.testsRun}")
     print(f"   Execution time: {execution_time:.2f}s")
     print(f"   Failures: {len(result.failures)}")
     print(f"   Errors: {len(result.errors)}")
     
     if execution_time < 10:
-        print(f"   ⚡ Fast execution achieved! (target: <10s)")
+        print(f"   ⚡ Fast execution achieved!")
     elif execution_time < 30:
-        print(f"   ✅ Good execution time (target: <30s)")
+        print(f"   ✅ Good execution time")
     else:
-        print(f"   ⚠️  Slow execution (consider further optimization)")
+        print(f"   ⚠️  Slow execution")
     
     if result.failures:
         print(f"\n❌ Failures:")
@@ -877,18 +877,13 @@ if __name__ == '__main__':
     
     if result.wasSuccessful():
         print("\n✅ All tests passed! The Bitcoin DCA Analyzer is working correctly.")
-        print("📊 Optimized test scenarios verified:")
-        print("   - Valid Bitcoin price data processing (mocked dependencies)")
+        print("📊 Test scenarios verified:")
+        print("   - Valid Bitcoin price data processing")
         print("   - Invalid/corrupted data handling")
-        print("   - DCA strategy analysis and backtesting (reduced datasets)")
-        print("   - Price prediction with fallback mechanisms (mocked ML models)")
+        print("   - DCA strategy analysis and backtesting")
+        print("   - Price prediction with fallback mechanisms")
         print("   - Edge cases and error conditions")
         print("   - UI features and cache management")
-        print("\n⚡ Performance optimizations:")
-        print("   - TensorFlow/sklearn operations fully mocked")
-        print("   - TA-Lib indicators mocked with realistic data")
-        print("   - Reduced dataset sizes for faster execution")
-        print("   - Network operations mocked to avoid delays")
     else:
         print(f"\n❌ {len(result.failures + result.errors)} test(s) failed")
         exit(1)
