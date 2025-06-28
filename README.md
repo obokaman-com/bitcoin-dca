@@ -11,10 +11,11 @@ A comprehensive terminal application for Bitcoin analysis featuring:
 ## Features
 
 ### 🔮 Price Prediction
-- **Deep Learning Models**: LSTM and Random Forest ensemble predictions
+- **Advanced 3-Model Ensemble**: LSTM, Random Forest, and XGBoost ensemble predictions
 - **Bitcoin-Specific Features**: Halving cycles, market maturity, supply analysis
 - **Technical Analysis**: 20+ technical indicators (RSI, MACD, Bollinger Bands, etc.)
 - **Pattern Recognition**: Time-based patterns and market cycle analysis
+- **Performance-Based Weighting**: Best-performing models get higher influence in final prediction
 
 ### 📈 DCA Recommendations
 - **Optimal Day Analysis**: Find the best day of month for DCA investments
@@ -202,7 +203,8 @@ Date,Open,High,Low,Close
 ## Advanced Features
 
 ### Prediction Models
-- **Ensemble Approach**: Combines LSTM and Random Forest predictions
+- **3-Model Ensemble**: Combines LSTM, Random Forest, and XGBoost predictions
+- **Performance-Based Weighting**: Models weighted by validation accuracy (lower MAE = higher weight)
 - **Feature Engineering**: 40+ engineered features including:
   - Technical indicators (SMA, EMA, RSI, MACD, Bollinger Bands)
   - Bitcoin halving cycle analysis
@@ -236,7 +238,8 @@ bitcoin_dca/
 
 ### Key Technologies
 - **pandas/numpy**: Data manipulation and analysis
-- **scikit-learn**: Machine learning algorithms
+- **scikit-learn**: Random Forest machine learning
+- **XGBoost**: Gradient boosting algorithms
 - **TensorFlow**: Deep learning (LSTM) models
 - **Rich**: Beautiful terminal interface
 - **TA-Lib**: Technical analysis indicators

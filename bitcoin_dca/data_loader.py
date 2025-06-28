@@ -227,6 +227,9 @@ class DataLoader:
         df['ATH'] = df['High'].expanding().max()
         df['Drawdown'] = (df['Close'] - df['ATH']) / df['ATH']
         
+        # CRITICAL: Add time-based features for date-aware predictions
+        df = self._add_time_features_fast(df)
+        
         return df
     
     def clear_cache(self):
