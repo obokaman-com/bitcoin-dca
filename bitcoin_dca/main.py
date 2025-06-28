@@ -18,8 +18,15 @@ import warnings
 import os
 import requests
 from pathlib import Path
+import subprocess
+import json
 
 from bitcoin_dca.data_loader import DataLoader, LazyFeatureManager
+
+# Version management
+APP_VERSION = "1.0.0"
+REPO_URL = "https://github.com/obokaman-com/bitcoin-dca"
+API_URL = "https://api.github.com/repos/obokaman-com/bitcoin-dca"
 
 def get_app_directory():
     """Get the application directory, creating it if needed"""
@@ -35,6 +42,84 @@ def get_app_directory():
 def get_default_csv_path():
     """Get the default CSV file path in the app directory"""
     return get_app_directory() / 'data' / 'btc_daily_2010_2025.csv'
+
+def get_current_commit_hash():
+    """Get the current local commit hash"""
+    try:
+        app_dir = get_app_directory()
+        if (app_dir / '.git').exists():
+            result = subprocess.run(
+                ['git', 'rev-parse', 'HEAD'],
+                cwd=app_dir,
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                return result.stdout.strip()
+    except:
+        pass
+    return None
+
+def get_remote_commit_hash():
+    """Get the latest commit hash from GitHub (with short timeout)"""
+    try:
+        # Short timeout to avoid blocking startup
+        response = requests.get(f"{API_URL}/commits/main", timeout=3)
+        if response.status_code == 200:
+            data = response.json()
+            return data['sha']
+    except:
+        # Silently fail - network issues shouldn't block the app
+        pass
+    return None
+
+def check_for_updates():
+    """Check if a newer version is available (non-blocking)"""
+    try:
+        local_hash = get_current_commit_hash()
+        if not local_hash:
+            return False, None
+            
+        # Quick timeout to avoid blocking
+        remote_hash = get_remote_commit_hash()
+        if not remote_hash:
+            return False, None
+        
+        if local_hash != remote_hash:
+            return True, remote_hash
+        return False, None
+    except:
+        # Silently fail - never block the app
+        return False, None
+
+def update_app():
+    """Update the application to the latest version"""
+    try:
+        app_dir = get_app_directory()
+        
+        with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress:
+            task = progress.add_task("Updating Bitcoin DCA Analyzer...", total=None)
+            
+            # Pull latest changes
+            result = subprocess.run(
+                ['git', 'pull', 'origin', 'main'],
+                cwd=app_dir,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0:
+                progress.update(task, description="✅ Update completed successfully")
+                return True, "Update completed successfully!"
+            else:
+                return False, f"Git pull failed: {result.stderr}"
+                
+    except subprocess.TimeoutExpired:
+        return False, "Update timed out"
+    except Exception as e:
+        return False, f"Update failed: {str(e)}"
 
 # Lazy imports - only import when needed
 _predictor_module = None
@@ -130,11 +215,16 @@ class BTCAnalyzer:
         welcome_text = Text()
         welcome_text.append("🚀 Bitcoin DCA Analysis Terminal\n", style="bold yellow")
         welcome_text.append("Advanced Bitcoin price analysis and DCA optimization\n", style="cyan")
+        welcome_text.append(f"Version: {APP_VERSION}\n", style="dim")
         welcome_text.append(f"Data range: {self.basic_data.index[0].strftime('%Y-%m-%d')} to {self.basic_data.index[-1].strftime('%Y-%m-%d')}\n", style="dim")
         welcome_text.append(f"Total records: {len(self.basic_data):,}\n", style="dim")
         welcome_text.append("⚡ Features computed on-demand for faster startup", style="green")
         
         console.print(Panel(welcome_text, title="Welcome", border_style="blue"))
+        
+        # Check for updates in background
+        if self.check_and_offer_update():
+            return True  # Signal restart needed
         
     def show_menu(self):
         """Display main menu"""
@@ -317,6 +407,7 @@ class BTCAnalyzer:
             console.print("[green]✅ Cache cleared successfully[/green]")
         except Exception as e:
             console.print(f"[red]❌ Error clearing cache: {str(e)}[/red]")
+    
             
     def show_market_overview(self):
         """Display market overview"""
@@ -344,6 +435,48 @@ class BTCAnalyzer:
             table.add_row("Recent Volatility", f"{recent_volatility:.1f}%")
         
         console.print(table)
+    
+    def check_and_offer_update(self):
+        """Check for updates and offer to update if available (non-blocking)"""
+        try:
+            # Quick, silent background check - no progress spinner to avoid blocking
+            has_update, remote_hash = check_for_updates()
+                
+            if has_update:
+                console.print()
+                console.print("[yellow]🔄 A newer version is available![/yellow]")
+                
+                # Show current vs available version info
+                local_hash = get_current_commit_hash()
+                if local_hash and remote_hash:
+                    console.print(f"[dim]Current: {local_hash[:8]}[/dim]")
+                    console.print(f"[dim]Latest:  {remote_hash[:8]}[/dim]")
+                
+                update_choice = Prompt.ask(
+                    "Would you like to update now?", 
+                    choices=["y", "n"], 
+                    default="n"
+                )
+                
+                if update_choice == "y":
+                    # Only show progress when actually updating
+                    with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress:
+                        task = progress.add_task("Updating...", total=None)
+                        success, message = update_app()
+                        progress.update(task, description="✅ Update completed" if success else "❌ Update failed")
+                    
+                    if success:
+                        console.print(f"[green]✅ {message}[/green]")
+                        console.print("[yellow]⚠️  Please restart the application to use the new version.[/yellow]")
+                        return True  # Indicate restart needed
+                    else:
+                        console.print(f"[red]❌ Update failed: {message}[/red]")
+                    
+        except Exception as e:
+            # Silently fail version check - don't interrupt user experience
+            pass
+            
+        return False
     
     # Display methods (same as original but shorter for brevity)
     def display_prediction_result(self, target_date, prediction):
@@ -475,7 +608,8 @@ class BTCAnalyzer:
         """Main application loop"""
         try:
             self.load_basic_data()
-            self.show_welcome()
+            if self.show_welcome():
+                return  # Exit if restart needed after update
             
             while True:
                 console.print()
