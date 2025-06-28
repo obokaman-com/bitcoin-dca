@@ -50,14 +50,32 @@ curl -fsSL https://raw.githubusercontent.com/obokaman-com/bitcoin-dca/main/insta
 
 This will:
 - Install the app to `~/.bitcoin-dca/`
-- Install all dependencies
+- Install all dependencies (with version checking)
 - Create a global `btc-dca` command
 - Set up data and cache directories
+- Configure PATH for your shell (bash, zsh, fish)
+
+**Requirements:** Python 3.8+, pip3, git
+
+**Supported platforms:** macOS, Ubuntu, Debian, CentOS, RHEL, and other Linux distributions
 
 After installation, simply run:
 ```bash
 btc-dca
 ```
+
+### 🗑️ Uninstalling
+
+To completely remove the application:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/obokaman-com/bitcoin-dca/main/uninstall.sh | bash
+```
+
+This will:
+- Remove all application files from `~/.bitcoin-dca/`
+- Remove the global `btc-dca` command
+- Optionally backup your data before removal
 
 ### 📦 Manual Installation (Development)
 
@@ -278,6 +296,67 @@ bitcoin_dca/
 ## Disclaimer
 
 This tool is for educational and research purposes only. Cryptocurrency investments are highly volatile and risky. Past performance does not guarantee future results. Always do your own research and consider consulting with financial advisors before making investment decisions.
+
+## Troubleshooting
+
+### Installation Issues
+
+**Python version errors:**
+```bash
+# Check your Python version
+python3 --version
+
+# Update Python (macOS)
+brew install python3
+
+# Update Python (Ubuntu/Debian)
+sudo apt install python3.8 python3.8-pip
+```
+
+**TensorFlow installation issues on Apple Silicon:**
+```bash
+pip3 install tensorflow-macos --user
+```
+
+**Missing system dependencies:**
+```bash
+# macOS
+xcode-select --install
+
+# Ubuntu/Debian
+sudo apt install build-essential python3-dev
+
+# CentOS/RHEL
+sudo yum groupinstall "Development Tools"
+```
+
+**Permission errors:**
+```bash
+# Ensure ~/.local/bin exists and is writable
+mkdir -p ~/.local/bin
+chmod 755 ~/.local/bin
+```
+
+### Runtime Issues
+
+**Command not found after installation:**
+```bash
+# Restart terminal or reload shell
+source ~/.bashrc  # or ~/.zshrc
+
+# Or add to PATH manually
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+**Dependency errors:**
+```bash
+# Reinstall dependencies
+pip3 install -r requirements.txt --user --force-reinstall
+
+# Or reinstall the entire application
+curl -fsSL https://raw.githubusercontent.com/obokaman-com/bitcoin-dca/main/uninstall.sh | bash
+curl -fsSL https://raw.githubusercontent.com/obokaman-com/bitcoin-dca/main/install.sh | bash
+```
 
 ## Contributing
 

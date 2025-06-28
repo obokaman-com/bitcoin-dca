@@ -408,6 +408,7 @@ class BTCAnalyzer:
         except Exception as e:
             console.print(f"[red]❌ Error clearing cache: {str(e)}[/red]")
     
+    
             
     def show_market_overview(self):
         """Display market overview"""
@@ -641,10 +642,24 @@ class BTCAnalyzer:
 @click.option('--csv', default=None, help='Path to Bitcoin price CSV file')
 def main(csv):
     """Bitcoin DCA Analysis Terminal Application"""
-    if csv is None:
-        csv = str(get_default_csv_path())
-    analyzer = BTCAnalyzer(csv)
-    analyzer.run()
+    try:
+        if csv is None:
+            csv = str(get_default_csv_path())
+        analyzer = BTCAnalyzer(csv)
+        analyzer.run()
+    except ImportError as e:
+        console.print(f"[red]❌ Missing required dependency: {e}[/red]")
+        console.print("[yellow]Please ensure all dependencies are installed:[/yellow]")
+        console.print("  pip3 install -r requirements.txt --user")
+        console.print("[dim]Or reinstall the application:[/dim]")
+        console.print("  curl -fsSL https://raw.githubusercontent.com/obokaman-com/bitcoin-dca/main/install.sh | bash")
+        exit(1)
+    except Exception as e:
+        console.print(f"[red]❌ Application startup error: {e}[/red]")
+        console.print("[yellow]If this persists, try reinstalling:[/yellow]")
+        console.print("  curl -fsSL https://raw.githubusercontent.com/obokaman-com/bitcoin-dca/main/uninstall.sh | bash")
+        console.print("  curl -fsSL https://raw.githubusercontent.com/obokaman-com/bitcoin-dca/main/install.sh | bash")
+        exit(1)
 
 if __name__ == "__main__":
     main()

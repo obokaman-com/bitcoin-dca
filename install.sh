@@ -43,18 +43,44 @@ command_exists() {
 check_prerequisites() {
     print_status "Checking prerequisites..."
     
+    # Check Python 3
     if ! command_exists python3; then
-        print_error "Python 3 is required but not installed. Please install Python 3 and try again."
+        print_error "Python 3 is required but not installed."
+        print_status "Please install Python 3.8+ and try again:"
+        print_status "  macOS: brew install python3"
+        print_status "  Ubuntu/Debian: sudo apt install python3 python3-pip"
+        print_status "  CentOS/RHEL: sudo yum install python3 python3-pip"
         exit 1
     fi
     
+    # Check Python version (need 3.8+ for TensorFlow)
+    python_version=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+    if ! python3 -c "import sys; exit(0 if sys.version_info >= (3, 8) else 1)"; then
+        print_error "Python 3.8+ is required, but found Python $python_version"
+        print_status "Please upgrade Python and try again:"
+        print_status "  macOS: brew install python3"
+        print_status "  Ubuntu/Debian: sudo apt install python3.8+"
+        exit 1
+    fi
+    print_success "Python $python_version detected"
+    
+    # Check pip3
     if ! command_exists pip3; then
-        print_error "pip3 is required but not installed. Please install pip3 and try again."
+        print_error "pip3 is required but not installed."
+        print_status "Please install pip3 and try again:"
+        print_status "  macOS: python3 -m ensurepip --upgrade"
+        print_status "  Ubuntu/Debian: sudo apt install python3-pip"
+        print_status "  CentOS/RHEL: sudo yum install python3-pip"
         exit 1
     fi
     
+    # Check Git
     if ! command_exists git; then
-        print_error "Git is required but not installed. Please install Git and try again."
+        print_error "Git is required but not installed."
+        print_status "Please install Git and try again:"
+        print_status "  macOS: brew install git"
+        print_status "  Ubuntu/Debian: sudo apt install git"
+        print_status "  CentOS/RHEL: sudo yum install git"
         exit 1
     fi
     
@@ -100,9 +126,33 @@ install_dependencies() {
     print_status "Installing Python dependencies..."
     
     cd "$INSTALL_DIR"
-    pip3 install -r requirements.txt --user >/dev/null 2>&1
     
-    print_success "Dependencies installed!"
+    # Try to install dependencies with better error handling
+    if ! pip3 install -r requirements.txt --user --quiet; then
+        print_error "Failed to install Python dependencies"
+        print_status "This could be due to:"
+        print_status "  - Missing system libraries (see error above)"
+        print_status "  - Insufficient disk space"
+        print_status "  - Network connectivity issues"
+        print_status "  - Python version compatibility"
+        print_status ""
+        print_status "Try installing manually:"
+        print_status "  pip3 install -r requirements.txt --user"
+        print_status ""
+        print_status "For TensorFlow issues on macOS with Apple Silicon:"
+        print_status "  pip3 install tensorflow-macos --user"
+        exit 1
+    fi
+    
+    # Verify critical dependencies are importable
+    if ! python3 -c "import pandas, numpy, rich, click" 2>/dev/null; then
+        print_error "Critical dependencies failed to import properly"
+        print_status "Try running the application manually to see detailed error:"
+        print_status "  cd $INSTALL_DIR && python3 -m bitcoin_dca.main"
+        exit 1
+    fi
+    
+    print_success "Dependencies installed and verified!"
 }
 
 # Create executable script
@@ -133,18 +183,66 @@ update_path() {
         print_warning "~/.local/bin is not in your PATH."
         print_status "Adding ~/.local/bin to your shell configuration..."
         
-        # Detect shell and update appropriate config file
-        if [ -n "$ZSH_VERSION" ] || [ "$SHELL" = "/bin/zsh" ] || [ "$SHELL" = "/usr/bin/zsh" ]; then
-            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.zshrc"
-            print_status "Added to ~/.zshrc"
-        elif [ -n "$BASH_VERSION" ] || [ "$SHELL" = "/bin/bash" ] || [ "$SHELL" = "/usr/bin/bash" ]; then
-            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
-            print_status "Added to ~/.bashrc"
-        else
-            print_warning "Unknown shell. Please manually add ~/.local/bin to your PATH."
-        fi
+        # More robust shell detection
+        current_shell=$(basename "$SHELL" 2>/dev/null || echo "unknown")
+        config_file=""
         
-        print_warning "Please restart your terminal or run: source ~/.bashrc (or ~/.zshrc)"
+        case "$current_shell" in
+            "zsh")
+                config_file="$HOME/.zshrc"
+                ;;
+            "bash")
+                # Check for .bash_profile on macOS, .bashrc on Linux
+                if [[ "$OSTYPE" == "darwin"* ]] && [ -f "$HOME/.bash_profile" ]; then
+                    config_file="$HOME/.bash_profile"
+                else
+                    config_file="$HOME/.bashrc"
+                fi
+                ;;
+            "fish")
+                print_warning "Fish shell detected. Please manually add to your config:"
+                print_status "  fish_add_path ~/.local/bin"
+                return
+                ;;
+            *)
+                print_warning "Unknown shell ($current_shell). Please manually add ~/.local/bin to your PATH."
+                print_status "Add this line to your shell config file:"
+                print_status "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+                return
+                ;;
+        esac
+        
+        if [ -n "$config_file" ]; then
+            # Create config file if it doesn't exist
+            touch "$config_file"
+            
+            # Check if PATH export already exists
+            if ! grep -q "HOME/.local/bin" "$config_file" 2>/dev/null; then
+                echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$config_file"
+                print_success "Added to $config_file"
+                print_warning "Please restart your terminal or run: source $(basename $config_file)"
+            else
+                print_status "PATH already configured in $config_file"
+            fi
+        fi
+    else
+        print_success "~/.local/bin is already in your PATH"
+    fi
+}
+
+# Detect OS for better error messages
+detect_os() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "macOS"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        if [ -f /etc/os-release ]; then
+            . /etc/os-release
+            echo "$NAME"
+        else
+            echo "Linux"
+        fi
+    else
+        echo "$OSTYPE"
     fi
 }
 
@@ -152,13 +250,25 @@ update_path() {
 verify_installation() {
     print_status "Verifying installation..."
     
-    if [ -f "$BIN_DIR/btc-dca" ] && [ -x "$BIN_DIR/btc-dca" ]; then
-        print_success "Installation verified!"
-        return 0
-    else
-        print_error "Installation verification failed!"
+    # Check if executable exists and is executable
+    if [ ! -f "$BIN_DIR/btc-dca" ]; then
+        print_error "Executable not found: $BIN_DIR/btc-dca"
         return 1
     fi
+    
+    if [ ! -x "$BIN_DIR/btc-dca" ]; then
+        print_error "Executable is not executable: $BIN_DIR/btc-dca"
+        return 1
+    fi
+    
+    # Try to run a quick test (just check if it starts)
+    if ! "$BIN_DIR/btc-dca" --help >/dev/null 2>&1; then
+        print_warning "Executable created but may have runtime issues"
+        print_status "Try running manually to debug: $BIN_DIR/btc-dca"
+    fi
+    
+    print_success "Installation verified!"
+    return 0
 }
 
 # Main installation function
@@ -166,6 +276,10 @@ main() {
     echo ""
     echo "🚀 Bitcoin DCA Analyzer - Installation Script"
     echo "============================================="
+    echo ""
+    
+    detected_os=$(detect_os)
+    print_status "Detected OS: $detected_os"
     echo ""
     
     check_prerequisites
