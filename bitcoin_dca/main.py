@@ -21,6 +21,21 @@ from pathlib import Path
 
 from bitcoin_dca.data_loader import DataLoader, LazyFeatureManager
 
+def get_app_directory():
+    """Get the application directory, creating it if needed"""
+    app_dir = Path.home() / '.bitcoin-dca'
+    app_dir.mkdir(exist_ok=True)
+    
+    # Create subdirectories
+    (app_dir / 'data').mkdir(exist_ok=True)
+    (app_dir / '.cache').mkdir(exist_ok=True)
+    
+    return app_dir
+
+def get_default_csv_path():
+    """Get the default CSV file path in the app directory"""
+    return get_app_directory() / 'data' / 'btc_daily_2010_2025.csv'
+
 # Lazy imports - only import when needed
 _predictor_module = None
 _dca_analyzer_module = None  
@@ -489,9 +504,11 @@ class BTCAnalyzer:
             console.print(f"[red]❌ Application error: {str(e)}[/red]")
 
 @click.command()
-@click.option('--csv', default='data/btc_daily_2010_2025.csv', help='Path to Bitcoin price CSV file')
+@click.option('--csv', default=None, help='Path to Bitcoin price CSV file')
 def main(csv):
     """Bitcoin DCA Analysis Terminal Application"""
+    if csv is None:
+        csv = str(get_default_csv_path())
     analyzer = BTCAnalyzer(csv)
     analyzer.run()
 

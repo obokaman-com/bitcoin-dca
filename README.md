@@ -40,10 +40,41 @@ A comprehensive terminal application for Bitcoin analysis featuring:
 
 ## Installation
 
-1. **Clone or download the project files**
+### 🚀 One-Liner Installation (Recommended)
+
+Install globally with a single command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/obokaman-com/bitcoin-dca/main/install.sh | bash
+```
+
+This will:
+- Install the app to `~/.bitcoin-dca/`
+- Install all dependencies
+- Create a global `btc-dca` command
+- Set up data and cache directories
+
+After installation, simply run:
+```bash
+btc-dca
+```
+
+### 📦 Manual Installation (Development)
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/obokaman-com/bitcoin-dca.git
+   cd bitcoin-dca
+   ```
+
 2. **Install dependencies**:
    ```bash
    pip install -r requirements.txt
+   ```
+
+3. **Install as package**:
+   ```bash
+   pip install -e .
    ```
 
 ## Testing
@@ -72,12 +103,19 @@ pip install -e .
 ```
 
 ### Quick Start
-```bash
-# Run from anywhere after installation
-btc-dca
 
-# Or run as module
+**After one-liner installation:**
+```bash
+btc-dca
+```
+
+**For manual installation:**
+```bash
+# Run as module
 python -m bitcoin_dca.main
+
+# Or if installed as package
+btc-dca
 ```
 **Startup time: ~1-2 seconds** with optimized on-demand feature loading
 

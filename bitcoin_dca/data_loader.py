@@ -15,7 +15,10 @@ import ta
 class DataLoader:
     def __init__(self, csv_path: str):
         self.csv_path = csv_path
-        self.cache_dir = Path('.cache')
+        # Use global app directory for cache
+        app_dir = Path.home() / '.bitcoin-dca'
+        app_dir.mkdir(exist_ok=True)
+        self.cache_dir = app_dir / '.cache'
         self.cache_dir.mkdir(exist_ok=True)
         
     def get_cache_key(self) -> str:
